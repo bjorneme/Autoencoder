@@ -162,17 +162,3 @@ class VerificationNet:
             accuracy = None
 
         return predictability, accuracy
-
-
-if __name__ == "__main__":
-    gen = StackedMNISTData(mode=DataMode.MONO_BINARY_COMPLETE, default_batch_size=2048)
-    net = VerificationNet(force_learn=False)
-    net.train(generator=gen, epochs=5)
-
-    # I have no data generator (VAE or whatever) here, so just use a sampled set
-    img, labels = gen.get_random_batch(training=True, batch_size=25000)
-    cov = net.check_class_coverage(data=img, tolerance=0.98)
-    pred, acc = net.check_predictability(data=img, correct_labels=labels)
-    print(f"Coverage: {100*cov:.2f}%")
-    print(f"Predictability: {100*pred:.2f}%")
-    print(f"Accuracy: {100 * acc:.2f}%")

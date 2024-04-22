@@ -38,7 +38,7 @@ class Decoder(nn.Module):
 
         # Decoder
         self.linear_decoder = nn.Sequential(
-            nn.Linear(latent_dimension, 128),
+            nn.Linear(latent_dimension, 128), # Output size: [batch_size, 128]
             nn.ReLU()
         )
 
@@ -76,6 +76,7 @@ class Autoencoder(nn.Module):
         self.decoder = Decoder(channels, latent_dimension)
 
     def forward(self, x):
+        # Forward pass Autoencoder
         x = self.encoder(x)
         x = self.decoder(x)
         return x
