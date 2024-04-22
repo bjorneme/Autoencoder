@@ -72,7 +72,7 @@ class System:
             # Plot original and reconstructed images
             self.plot_results(images, outputs)
 
-    def plot_results(self, original, reconstructed, num_images = 8):
+    def plot_results(self, original, reconstructed, num_images = 10):
         # Rearrange image tensor dimensions: [batch_size, 28, 28, channels]
         original = original.permute(0, 2, 3, 1).numpy()
         reconstructed = reconstructed.permute(0, 2, 3, 1).numpy()
@@ -91,3 +91,33 @@ class System:
             ax.get_xaxis().set_visible(False)
             ax.get_yaxis().set_visible(False)
         plt.show()
+
+    def generate_images(self, num_samples=10):
+        # Generate new images from random latent vectors
+        self.model.eval()
+        with torch.no_grad():
+            z = torch.randn(num_samples, 64)
+            generated_images = self.model.decoder(z.reshape(num_samples,64,1,1))
+            generated_images = generated_images.permute(0, 2, 3, 1).numpy()
+            plt.figure(figsize=(20, 4))
+            for i in range(num_samples):
+                ax = plt.subplot(1, num_samples, i + 1)
+                plt.imshow(generated_images[i].squeeze(), cmap='gray')
+                ax.get_xaxis().set_visible(False)
+                ax.get_yaxis().set_visible(False)
+            plt.show()
+
+    def anomaly_detection(self, top_k=10):
+        # Detect anomalies based on reconstruction loss, showing the top k anomalous images
+        self.model.eval()
+        with torch.no_grad():
+            test_loader = DataLoader(TensorDataset(self.test_images, self.test_images), batch_size=1, shuffle=False)
+            anomaly_scores = []
+            for data in test_loader:
+                images, _ = data
+                outputs = self.model(images)
+                loss = torch.nn.functional.mse_loss(outputs, images, reduction='none').mean([1, 2, 3]).numpy()
+                anomaly_scores.extend(loss)
+            top_k_indices = np.argsort(anomaly_scores)[-top_k:]
+            top_k_anomalies = self.test_images[top_k_indices]
+            self.plot_results(top_k_anomalies, self.model(top_k_anomalies))
