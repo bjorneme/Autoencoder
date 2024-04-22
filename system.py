@@ -8,7 +8,10 @@ from autoencoder import Autoencoder
 from stacked_mnist_tf import StackedMNISTData
 
 class System:
-    def __init__(self, model_type, data_mode):
+    def __init__(self, model_type, data_mode, latent_dimension):
+        # Initialize latent dimension
+        self.latent_dimension = latent_dimension
+
         # Initialize model
         self.model_type = model_type
         self.data_mode = data_mode
@@ -16,6 +19,7 @@ class System:
 
         # Initialize data configuration
         self.train_images, self.train_labels, self.test_images, self.test_labels = self.load_data()
+
 
     def initialize_model(self):
         # Determine number of channels based on data_mode (COLOR vs. MONO)
@@ -25,7 +29,7 @@ class System:
 
         # Create model with specific number of channels
         if self.model_type == 'AE':
-            return Autoencoder(channels)
+            return Autoencoder(channels, self.latent_dimension)
         else:
             raise ValueError("Unsupported model type")
         
@@ -46,8 +50,9 @@ class System:
         criterion = torch.nn.BCELoss()
         optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
         train_loader = DataLoader(TensorDataset(self.train_images, self.train_images), batch_size=batch_size, shuffle=True)
+        validation_loader = DataLoader(TensorDataset(self.test_images, self.test_images), batch_size=batch_size, shuffle=False)
 
-        # Training loop
+        # Training Loop
         for epoch in range(epochs):
             total_loss = 0
             for data in train_loader:
@@ -58,7 +63,19 @@ class System:
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
-            print(f'Epoch {epoch+1}, Loss: {total_loss/len(train_loader)}')
+            
+            # Validation phase
+            val_loss = 0
+            self.model.eval()
+            with torch.no_grad():
+                for data in validation_loader:
+                    inputs, targets = data
+                    outputs = self.model(inputs)
+                    loss = criterion(outputs, targets)
+                    val_loss += loss.item()
+
+            print(f'Epoch {epoch+1}, Training Loss: {total_loss/len(train_loader)}, Validation Loss: {val_loss/len(validation_loader)}')
+            self.model.train()
 
     def evaluation(self):
         # Set model to evaluation mode and disable gradient calculations
@@ -96,8 +113,8 @@ class System:
         # Generate new images from random latent vectors
         self.model.eval()
         with torch.no_grad():
-            z = torch.randn(num_samples, 64)
-            generated_images = self.model.decoder(z.reshape(num_samples,64,1,1))
+            z = torch.rand(num_samples, self.latent_dimension)
+            generated_images = self.model.decoder(z)
             generated_images = generated_images.permute(0, 2, 3, 1).numpy()
             plt.figure(figsize=(20, 4))
             for i in range(num_samples):
