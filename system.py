@@ -8,6 +8,8 @@ from autoencoder import Autoencoder
 from stacked_mnist_tf import StackedMNISTData
 from verification_net import VerificationNet
 
+
+# System class
 class System:
     def __init__(self, model_type, data_mode, latent_dimension):
         # Initialize latent dimension
@@ -27,8 +29,10 @@ class System:
         if not self.verification_net.done_training:
             print("Training the verification network...")
             self.verification_net.train(generator=self.data_generator, epochs=10)
-        
 
+        # Initialize tolerace
+        self.tolerance: float = 0.5 if 'COLOR' in self.data_mode.name else 0.8
+        
 
     def initialize_model(self):
         # Determine number of channels based on data_mode (COLOR vs. MONO)
@@ -53,53 +57,90 @@ class System:
 
         return train_images, train_labels, test_images, test_labels
 
+
     def train(self, epochs=10, batch_size=256):
-        # Set model to training mode and define loss function and optimizer
+        # Set model to training mode
         self.model.train()
+
+        # Initialize binary cross-entropy loss function
         loss_function = torch.nn.BCELoss()
-        optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
+
+        # Create optimizer
+        optimizer = optim.Adam(self.model.parameters(), lr=0.001)
+
+        # Prepare dataloaders for training and validation sets
         train_loader = DataLoader(TensorDataset(self.train_images, self.train_images), batch_size=batch_size, shuffle=True)
         validation_loader = DataLoader(TensorDataset(self.test_images, self.test_images), batch_size=batch_size, shuffle=False)
 
-        # Training Loop
+        # Loop over each model to train the model
         for epoch in range(epochs):
             total_loss = 0
-            for data in train_loader:
-                inputs, targets = data
+
+            # Loop over each batch from training loader
+            for inputs, targets in train_loader:
+
+                # Reset optimizer
                 optimizer.zero_grad()
+
+                # Forward pass
                 outputs = self.model(inputs)
+
+                # Compute the loss
                 loss = loss_function(outputs, targets)
+
+                # Backpropagation
                 loss.backward()
+
+                # Update the model parameters
                 optimizer.step()
+
                 total_loss += loss.item()
             
             # Validation
             val_loss = self.validation(validation_loader, loss_function)
             
+            # Print losses for the current epoch
             print(f'Epoch {epoch+1}, Training Loss: {total_loss/len(train_loader)}, Validation Loss: {val_loss/len(validation_loader)}')
-        
-    def validation(self, loader, loss_function):
+
+
+    def validation(self, validation_loader, loss_function):
+        # Set model to evaluation mode
         self.model.eval()
         val_loss = 0
+
+        # Disable gradients
         with torch.no_grad():
-            for data in loader:
-                inputs, targets = data
+
+            # Loop over validation data
+            for inputs, targets in validation_loader:
+  
+                # Forward pass
                 outputs = self.model(inputs)
+
+                # Calculate loss
                 loss = loss_function(outputs, targets)
                 val_loss += loss.item()
+
+        # Return total validation loss
         return val_loss
 
     def evaluation(self):
-        # Set model to evaluation mode and disable gradient calculations
+        # Set model to evaluation mode
         self.model.eval()
-        with torch.no_grad():
-            test_loader = DataLoader(TensorDataset(self.test_images, self.test_images), batch_size=10, shuffle=True)
-            data_iter = iter(test_loader)
-            images, _ = next(data_iter)
-            outputs = self.model(images)
 
-            # Plot original and reconstructed images
-            self.plot_results(images, outputs)
+        # Disable gradient calculations
+        with torch.no_grad():
+
+            # Create reconstructions from test images
+            reconstructions = self.model(self.test_images)
+
+            # Evaluate using the VerificationNet
+            predictability, accuracy = self.verification_net.check_predictability(reconstructions.permute(0, 2, 3, 1).numpy(), self.test_labels, self.tolerance)
+            print(f"Predictability: {predictability:.4f}, Accuracy: {accuracy:.4f}")
+
+        # Plot result
+        self.plot_results(self.test_images[:10], reconstructions[:10])
+
 
     def plot_results(self, original, reconstructed, num_images = 10):
         # Rearrange image tensor dimensions: [batch_size, 28, 28, channels]
@@ -121,13 +162,25 @@ class System:
             ax.get_yaxis().set_visible(False)
         plt.show()
 
+
     def generate_images(self, num_samples=10):
+
         # Generate new images from random latent vectors
         self.model.eval()
+
+        # Disable gradients
         with torch.no_grad():
-            z = torch.rand(num_samples, self.latent_dimension)
+
+            # Generate latent vector
+            z = torch.rand(10000, self.latent_dimension)
+
+            # Send the latent vector through the decoder
             generated_images = self.model.decoder(z)
+
+            # Reshape the generated images for plotting and evaluation
             generated_images = generated_images.permute(0, 2, 3, 1).numpy()
+
+            # Display generated images
             plt.figure(figsize=(20, 4))
             for i in range(num_samples):
                 ax = plt.subplot(1, num_samples, i + 1)
@@ -136,14 +189,23 @@ class System:
                 ax.get_yaxis().set_visible(False)
             plt.show()
 
+        # Evaluate quality and coverage of generated images
         self.evaluate_images(generated_images)
 
+
     def anomaly_detection(self, top_k=10):
-        # Detect anomalies based on reconstruction loss, showing the top k anomalous images
+
+        # Set model to evaluation mode
         self.model.eval()
+
+        # Disable gradients
         with torch.no_grad():
+
+            # Prepare the data loader for the test dataset
             test_loader = DataLoader(TensorDataset(self.test_images, self.test_images), batch_size=1, shuffle=False)
             anomaly_scores = []
+
+            # Loop over the test loader and calculate loss
             for data in test_loader:
                 images, _ = data
                 outputs = self.model(images)
@@ -155,11 +217,14 @@ class System:
             top_k_anomalies = self.test_images[top_k_indices]
             self.plot_results(top_k_anomalies, self.model(top_k_anomalies))
 
+
     def evaluate_images(self, generated_images):
-        # Evaluate quality and diveristy of the model
-        coverage = self.verification_net.check_class_coverage(generated_images)
-        predictability, _ = self.verification_net.check_predictability(generated_images)
-        print(f"Coverage: {coverage * 100:.2f}%")
-        print(f"Predictability: {predictability * 100:.2f}%")
+        # Evaluate coverage: diversity
+        coverage = self.verification_net.check_class_coverage(generated_images, self.tolerance)
+        print(f"Coverage: {coverage:.4f}")
+
+        # Evaluate predictability: quality
+        predictability, _ = self.verification_net.check_predictability(generated_images, None, self.tolerance)
+        print(f"Predictability: {predictability:.4f}")
 
         
