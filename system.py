@@ -4,7 +4,8 @@ from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
 import numpy as np
 
-from autoencoder import Autoencoder
+from autoencoder.autoencoder import Autoencoder
+from autoencoder.vae import VAE
 from stacked_mnist_tf import StackedMNISTData
 from verification_net import VerificationNet
 
@@ -43,6 +44,8 @@ class System:
         # Create model with specific number of channels
         if self.model_type == 'AE':
             return Autoencoder(channels, self.latent_dimension)
+        if self.model_type == 'VAE':
+            return VAE(channels, self.latent_dimension)
         else:
             raise ValueError("Unsupported model type")
         
@@ -62,8 +65,11 @@ class System:
         # Set model to training mode
         self.model.train()
 
-        # Initialize binary cross-entropy loss function
-        loss_function = torch.nn.BCELoss()
+        # Initialize loss function
+        if self.model_type == 'AE':
+            loss_function = torch.nn.BCELoss()
+        elif self.model_type == 'VAE':
+            loss_function = self.vae_loss
 
         # Create optimizer
         optimizer = optim.Adam(self.model.parameters(), lr=0.001)
@@ -82,11 +88,19 @@ class System:
                 # Reset optimizer
                 optimizer.zero_grad()
 
-                # Forward pass
-                outputs = self.model(inputs)
+                if self.model_type == 'AE':
+                    # Forward pass
+                    outputs = self.model(inputs)
 
-                # Compute the loss
-                loss = loss_function(outputs, targets)
+                    # Compute loss
+                    loss = loss_function(outputs, targets)
+
+                elif self.model_type == 'VAE':
+                    # Forward pass
+                    outputs, mean, logvar = self.model(inputs)
+
+                    # Compute loss
+                    loss = self.vae_loss(outputs, targets, mean, logvar)
 
                 # Backpropagation
                 loss.backward()
@@ -103,6 +117,15 @@ class System:
             print(f'Epoch {epoch+1}, Training Loss: {total_loss/len(train_loader)}, Validation Loss: {val_loss/len(validation_loader)}')
 
 
+    def vae_loss(self, outputs, targets, mean, logvar):
+        # Compute the binary cross-entropy loss between the reconstructed images and the original images
+        loss = torch.nn.functional.binary_cross_entropy(outputs, targets, reduction='sum')
+
+        # Compute the Kullback-Leibler divergence (KLD) between the learned latent distribution and the prior
+        kld = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
+
+        return loss + kld
+
     def validation(self, validation_loader, loss_function):
         # Set model to evaluation mode
         self.model.eval()
@@ -114,11 +137,20 @@ class System:
             # Loop over validation data
             for inputs, targets in validation_loader:
   
-                # Forward pass
-                outputs = self.model(inputs)
+                if self.model_type == 'VAE':
+                    # Forward pass
+                    outputs, mean, logvar = self.model(inputs)
 
-                # Calculate loss
-                loss = loss_function(outputs, targets)
+                    # Calculate loss
+                    loss = self.vae_loss(outputs, targets, mean, logvar)
+
+                elif self.model_type == 'AE':
+                    # Forward pass
+                    outputs = self.model(inputs)
+
+                    # Calculate loss
+                    loss = loss_function(outputs, targets)
+
                 val_loss += loss.item()
 
         # Return total validation loss
@@ -131,8 +163,12 @@ class System:
         # Disable gradient calculations
         with torch.no_grad():
 
-            # Create reconstructions from test images
-            reconstructions = self.model(self.test_images)
+            if self.model_type == 'VAE':
+                # Create reconstructions from test images
+                reconstructions, _, _ = self.model(self.test_images)
+            else:
+                # Create reconstructions from test images
+                reconstructions = self.model(self.test_images)
 
             # Evaluate using the VerificationNet
             predictability, accuracy = self.verification_net.check_predictability(reconstructions.permute(0, 2, 3, 1).numpy(), self.test_labels, self.tolerance)
@@ -193,6 +229,9 @@ class System:
         self.evaluate_images(generated_images)
 
 
+# TODO ============================================================
+# Implement support for VAE
+
     def anomaly_detection(self, top_k=10):
 
         # Set model to evaluation mode
@@ -208,7 +247,12 @@ class System:
             # Loop over the test loader and calculate loss
             for data in test_loader:
                 images, _ = data
-                outputs = self.model(images)
+
+                if self.model_type == 'VAE':
+                    outputs, _, _ = self.model(images)
+                else:
+                    outputs = self.model(images)
+
                 loss = torch.nn.functional.mse_loss(outputs, images, reduction='none').mean([1, 2, 3]).numpy()
                 anomaly_scores.extend(loss)
 
