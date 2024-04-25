@@ -34,7 +34,7 @@ class VerificationNet:
 
         model.compile(
             loss=keras.losses.categorical_crossentropy,
-            optimizer=keras.optimizers.Adam(lr=0.01),
+            optimizer=keras.optimizers.Adam(learning_rate=0.01),
             metrics=["accuracy"],
         )
 
