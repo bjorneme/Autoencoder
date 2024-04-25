@@ -1,8 +1,8 @@
 {
-    "model_type": "AE",
-    "task_type": "ANOM",
-    "data_mode": "COLOR_BINARY_MISSING",
+    "model_type": "VAE",
+    "task_type": "GEN",
+    "data_mode": "COLOR_BINARY_COMPLETE",
     "latent_dimension": 128,
     "epochs": 10,
-    "model_filepath": "models/ae_anom_stacked_128"
+    "model_filepath": "models/vae_gen_stacked_128"
 }
