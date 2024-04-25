@@ -1,0 +1,7 @@
+{
+    "model_type": "AE",
+    "task_type": "AE-BASIC",
+    "data_mode": "MONO_BINARY_COMPLETE",
+    "latent_dimension": 64,
+    "epochs": 10
+}
