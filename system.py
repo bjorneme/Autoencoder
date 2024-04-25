@@ -8,11 +8,12 @@ from autoencoder.autoencoder import Autoencoder
 from autoencoder.vae import VAE
 from stacked_mnist_tf import StackedMNISTData
 from verification_net import VerificationNet
+from visualization import plot_results
 
 
 # System class
 class System:
-    def __init__(self, model_type, data_mode, latent_dimension):
+    def __init__(self, model_type, data_mode, latent_dimension, model_filepath = None):
         # Initialize latent dimension
         self.latent_dimension = latent_dimension
 
@@ -33,6 +34,11 @@ class System:
 
         # Initialize tolerace
         self.tolerance: float = 0.5 if 'COLOR' in self.data_mode.name else 0.8
+
+        # Load a pretrained model
+        self.model_filepath = model_filepath
+        if self.model_filepath:
+            self.load_model(self.model_filepath)
         
 
     def initialize_model(self):
@@ -175,7 +181,7 @@ class System:
             print(f"Predictability: {predictability:.4f}, Accuracy: {accuracy:.4f}")
 
         # Plot result
-        self.plot_results(self.test_images[:10], reconstructions[:10])
+        plot_results(self.test_images[:10], reconstructions[:10])
 
     def generate_images(self, num_samples=10):
 
@@ -192,7 +198,7 @@ class System:
             generated_images = self.model.decoder(z)
 
             # Plot generated images
-            self.plot_results(generated_images[:num_samples])
+            plot_results(generated_images[:num_samples])
 
         # Evaluate quality and coverage of generated images
         self.evaluate_images(generated_images)
@@ -223,7 +229,7 @@ class System:
             top_k_indices = np.argsort(anomaly_scores)[-top_k:]
             top_k_anomalies = self.test_images[top_k_indices]
             top_k_anomalies_reconstruction = self.model(top_k_anomalies)
-            self.plot_results(top_k_anomalies, top_k_anomalies_reconstruction)
+            plot_results(top_k_anomalies, top_k_anomalies_reconstruction)
 
 
 
@@ -235,38 +241,20 @@ class System:
         # Evaluate predictability: quality
         predictability, _ = self.verification_net.check_predictability(generated_images, None, self.tolerance)
         print(f"Predictability: {predictability:.4f}")
-
         
-
+    
     #===========================================================================
-    # Plotting
-    def plot_results(self, original, reconstructed=None, num_images=10, plot_type='comparison'):
-        plt.figure(figsize=(20, 4))
+    # Save and Load model
+    def save_model(self):
+        # Saves the trained model
+        torch.save(self.model.state_dict(), self.model_filepath)
+        print(f"Model saved to: {self.model_filepath}")
 
-        print(reconstructed)
-        
-        # Compare two images
-        if plot_type == 'comparison':
-            original = original.permute(0, 2, 3, 1).numpy()
-            reconstructed = reconstructed.permute(0, 2, 3, 1).numpy()
-            for i in range(num_images):
-                # Display original
-                ax = plt.subplot(2, num_images, i + 1)
-                plt.imshow(original[i].squeeze(), cmap='gray')
-                ax.get_xaxis().set_visible(False)
-                ax.get_yaxis().set_visible(False)
-                # Display reconstruction
-                ax = plt.subplot(2, num_images, i + 1 + num_images)
-                plt.imshow(reconstructed[i].squeeze(), cmap='gray')
-                ax.get_xaxis().set_visible(False)
-                ax.get_yaxis().set_visible(False)
-
-        # Only plot the images, no comparison
-        elif plot_type == 'single':
-            original = original.permute(0, 2, 3, 1).numpy()
-            for i in range(num_images):
-                ax = plt.subplot(1, num_images, i + 1)
-                plt.imshow(original[i].squeeze(), cmap='gray')
-                ax.get_xaxis().set_visible(False)
-                ax.get_yaxis().set_visible(False)
-        plt.show()
+    def load_model(self, model_filepath):
+        # Loads a pre-trained model
+        try:
+            self.model.load_state_dict(torch.load(model_filepath))
+            self.model.eval()
+            print(f"Model loaded from: {model_filepath}")
+        except FileNotFoundError:
+            print(f"Pre-trained not found: {model_filepath}")

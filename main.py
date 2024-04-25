@@ -9,4 +9,4 @@ if __name__ == "__main__":
         latent_dimension=64
     )
     system.train(epochs=1)
-    system.anomaly_detection_ae()
+    system.evaluation()
