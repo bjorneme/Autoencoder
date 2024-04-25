@@ -1,31 +1,30 @@
 from matplotlib import pyplot as plt
 
-# Plotting
-def plot_results(original, reconstructed=None, num_images=10, plot_type='comparison'):
-    plt.figure(figsize=(20, 4))
-    
-    # Compare two images
-    if plot_type == 'comparison':
-        original = original.permute(0, 2, 3, 1).numpy()
-        reconstructed = reconstructed.permute(0, 2, 3, 1).numpy()
-        for i in range(num_images):
-            # Display original
-            ax = plt.subplot(2, num_images, i + 1)
-            plt.imshow(original[i].squeeze(), cmap='gray')
-            ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(False)
-            # Display reconstruction
-            ax = plt.subplot(2, num_images, i + 1 + num_images)
-            plt.imshow(reconstructed[i].squeeze(), cmap='gray')
-            ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(False)
+# Function used for plotting
+def plot_results(original, reconstructed=None, num_images=10, compare=False):
 
-    # Only plot the images, no comparison
-    elif plot_type == 'single':
-        original = original.permute(0, 2, 3, 1).numpy()
-        for i in range(num_images):
-            ax = plt.subplot(1, num_images, i + 1)
-            plt.imshow(original[i].squeeze(), cmap='gray')
-            ax.get_xaxis().set_visible(False)
-            ax.get_yaxis().set_visible(False)
+    # Reshape to correct format
+    original = original.permute(0, 2, 3, 1).numpy()
+    if compare:
+        reconstructed = reconstructed.permute(0, 2, 3, 1).numpy()
+    
+    # Set the number of rows in the plot based on whether comparison is needed
+    rows = 2 if compare else 1
+
+    # Initialize the plot
+    plt.figure(figsize=(15, 2 * rows))
+    
+    for i in range(num_images):
+        # Plot original images
+        ax = plt.subplot(rows, num_images, i + 1)
+        plt.imshow(original[i].squeeze(), cmap='gray')
+        ax.axis('off')
+        
+        if compare:
+            # Plot reconstructed images below originals for compariso
+            ax = plt.subplot(rows, num_images, num_images + i + 1)
+            plt.imshow(reconstructed[i].squeeze(), cmap='gray')
+            ax.axis('off')
+
+    # Display the plot    
     plt.show()

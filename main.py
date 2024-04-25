@@ -11,20 +11,21 @@ if __name__ == "__main__":
     system = System(
         model_type=config['model_type'],
         data_mode=getattr(DataMode, config['data_mode']),
-        latent_dimension=config['latent_dimension']
+        latent_dimension=config['latent_dimension'],
+        model_filepath=config['model_filepath']
     )
 
-    # Train and evaluate the model
+    # Train the model
     system.train(epochs=config['epochs'])
 
-    # AE-Basic
-    if config['task_type'] == 'AE-BASIC':
+    # AE-BASIC and VAE-BASIC
+    if config['task_type'] == 'BASIC':
         system.evaluation()
 
-    # AE-GEN
-    if config['task_type'] == 'AE-GEN':
+    # AE-GEN and VAE-GEN
+    if config['task_type'] == 'GEN':
         system.generate_images()
 
-    # AE-ANOM
-    if config['task_type'] == 'AE-ANOM' and config['model_type'] == 'AE':
+    # AE-ANOM 
+    if config['task_type'] == 'ANOM' and config['model_type'] == 'AE':
         system.anomaly_detection_ae()

@@ -3,6 +3,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
 import numpy as np
+import torch.nn.functional as F
 
 from autoencoder.autoencoder import Autoencoder
 from autoencoder.vae import VAE
@@ -122,13 +123,17 @@ class System:
             # Print losses for the current epoch
             print(f'Epoch {epoch+1}, Training Loss: {total_loss/len(train_loader)}, Validation Loss: {val_loss/len(validation_loader)}')
 
+        # Save the model
+        if self.model_filepath:
+            self.save_model()
 
-    def vae_loss(self, outputs, targets, mean, logvar):
+
+    def vae_loss(self, outputs, targets, mean, log_variance):
         # Compute the binary cross-entropy loss between the reconstructed images and the original images
         loss = torch.nn.functional.binary_cross_entropy(outputs, targets, reduction='sum')
 
-        # Compute the Kullback-Leibler divergence (KLD) between the learned latent distribution and the prior
-        kld = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
+        # Compute the KL divergence
+        kld = -0.5 * torch.sum(1 + log_variance - mean**2 - log_variance.exp())
 
         return loss + kld
 
@@ -180,10 +185,11 @@ class System:
             predictability, accuracy = self.verification_net.check_predictability(reconstructions.permute(0, 2, 3, 1).numpy(), self.test_labels, self.tolerance)
             print(f"Predictability: {predictability:.4f}, Accuracy: {accuracy:.4f}")
 
-        # Plot result
-        plot_results(self.test_images[:10], reconstructions[:10])
+        # Plot orginal vs. reconstructions
+        plot_results(self.test_images[:10], reconstructions[:10], compare=True)
 
-    def generate_images(self, num_samples=10):
+
+    def generate_images(self, plot_samples = 10, num_samples=10000):
 
         # Generate new images from random latent vectors
         self.model.eval()
@@ -192,23 +198,19 @@ class System:
         with torch.no_grad():
 
             # Generate latent vector
-            z = torch.rand(10000, self.latent_dimension)
+            z = torch.randn(num_samples, self.latent_dimension)
 
             # Send the latent vector through the decoder
             generated_images = self.model.decoder(z)
 
             # Plot generated images
-            plot_results(generated_images[:num_samples])
+            plot_results(generated_images[:plot_samples], compare=False)
 
         # Evaluate quality and coverage of generated images
         self.evaluate_images(generated_images)
 
 
-# TODO ============================================================
-# Implement support for VAE
-
     def anomaly_detection_ae(self, top_k=10):
-
         # Set model to evaluation mode
         self.model.eval()
 
@@ -222,15 +224,15 @@ class System:
             # Loop over the test loader and calculate loss
             for images, _ in test_loader:
                 outputs = self.model(images)
-                loss = torch.nn.functional.mse_loss(outputs, images, reduction='none').mean([1, 2, 3]).numpy()
-                anomaly_scores.extend(loss)
+                loss = torch.nn.functional.mse_loss(outputs, images).item()
+                anomaly_scores.append(loss)
 
-            # Identifying the top_k anomalies
-            top_k_indices = np.argsort(anomaly_scores)[-top_k:]
-            top_k_anomalies = self.test_images[top_k_indices]
-            top_k_anomalies_reconstruction = self.model(top_k_anomalies)
-            plot_results(top_k_anomalies, top_k_anomalies_reconstruction)
+            # Find index 
+            top_k_indexes  = np.argsort(anomaly_scores)[-top_k:]
+            top_images = self.test_images[top_k_indexes]
+            reconstructions = self.model(top_images)
 
+            plot_results(top_images, reconstructions, compare=True)
 
 
     def evaluate_images(self, generated_images):

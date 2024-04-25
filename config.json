@@ -1,7 +1,8 @@
 {
     "model_type": "AE",
-    "task_type": "AE-BASIC",
-    "data_mode": "MONO_BINARY_COMPLETE",
-    "latent_dimension": 64,
-    "epochs": 10
+    "task_type": "BASIC",
+    "data_mode": "COLOR_BINARY_COMPLETE",
+    "latent_dimension": 128,
+    "epochs": 1,
+    "model_filepath": null
 }
