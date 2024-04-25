@@ -207,7 +207,7 @@ class System:
             plot_results(generated_images[:plot_samples], compare=False)
 
         # Evaluate quality and coverage of generated images
-        self.evaluate_images(generated_images)
+        self.evaluate_images(generated_images.permute(0, 2, 3, 1).numpy())
 
 
     def anomaly_detection_ae(self, top_k=10):

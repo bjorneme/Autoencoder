@@ -12,7 +12,7 @@ def plot_results(original, reconstructed=None, num_images=10, compare=False):
     rows = 2 if compare else 1
 
     # Initialize the plot
-    plt.figure(figsize=(15, 2 * rows))
+    plt.figure(figsize=(12, 2 * rows))
     
     for i in range(num_images):
         # Plot original images
