@@ -1,8 +1,8 @@
 {
     "model_type": "AE",
-    "task_type": "BASIC",
-    "data_mode": "COLOR_BINARY_COMPLETE",
+    "task_type": "ANOM",
+    "data_mode": "COLOR_BINARY_MISSING",
     "latent_dimension": 128,
-    "epochs": 1,
-    "model_filepath": null
+    "epochs": 10,
+    "model_filepath": "models/ae_anom_stacked_128"
 }
