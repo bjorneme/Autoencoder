@@ -3,6 +3,6 @@
     "task_type": "GEN",
     "data_mode": "COLOR_BINARY_COMPLETE",
     "latent_dimension": 128,
-    "epochs": 10,
+    "epochs": 50,
     "model_filepath": "models/vae_gen_stacked_128"
 }
